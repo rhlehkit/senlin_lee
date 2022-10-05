@@ -28,10 +28,30 @@ Database 관련
 
 라고 한다. 그 이유를 찾아보면
 
+def cluster_lock_acquire(context, cluster_id, action_id, engine=None,
+                         scope=CLUSTER_SCOPE, forced=False):
+                         
+                         
+def node_lock_acquire(context, node_id, action_id, engine=None,
+                      forced=False)
 
+와 같은 lock를 빈번하게 사용하고 있음
+
+원인 1. ?
+
+    self._lock = threading.Lock()
+    
+    Oslo에서 제공하는 모듈의 경우 threading Lock() 를 사용하고 있음 
+    물론 각 execute가 thread로 돌아가긴 하는데 굳이 ? lock()을 잡아야하나 ?
+    
 
 원문보기:
 https://www.ciokorea.com/tags/662/%EC%98%A4%ED%94%88%EC%8A%A4%ED%83%9D/122204#csidx365d0a2ce03c92b9a43ce1eba536853 
+
+
+Senlin 구조 그리기
+
+
 
 
 
