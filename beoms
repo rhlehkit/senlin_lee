@@ -1,3 +1,6 @@
+from senlin.common.policies import webhooks
+
+
 코드 분석 10월 7일 
 
 
@@ -114,12 +117,42 @@ senlin 클러스터에서 특정 작업 이 자동으로 시작될 수 있도록
 #engine.receivers.base.py
 리시버 base 파일 
 두가지 타임 (webhook,message 지원)
+    message는 openstack 기반 zaqar 
+    webhooks은 rest api 기반
+
+
+6. action
+action은  클러스터 또는 노드 에서 수행할 수 있는 작업입니다. 각 action은 생성 후에 스레드에 의해 비동기적으로 실행됩니다
+대부분의 Senlin API는 일부 객체 검색 또는 객체 목록 API를 제외하고 Senlin 엔진 내부에서 비동기적으로 실행됩니다.
+#engine.actions.base
+action 정의 하는 부분 
+
 
 해당 함수에서 Action을 만들고 이를 수행
+
+위와 같이 특정 동작 과정에서 아래와 같은 함수를 사용
+def signal
+ao.Action.signal(self.context, self.id, cmd)
     #engine.actions.base
     action 정의 하는 부분 
 
+    node action
     #engine.actions.node_action.py
+
+    cluster action
+    #engine.actions.cluster_action.py
+
+
+7. dispatcher
+def notify(method, engine_id=None, **kwargs):
+    """Send notification to dispatcher."""
+
+8. event
+이벤트 는 엔진 실행 중에 생성되는 레코드입니다 .
+
+기본 제공 디스패처 중 두 가지는 database및 message입니다.
+senlin 명령줄을 사용하여 관심 있는 이벤트에 대한 세부 정보를 표시할 수 있습니다. 
+
 
 
 기범 여담
@@ -129,3 +162,28 @@ senlin 클러스터에서 특정 작업 이 자동으로 시작될 수 있도록
 특히 cluster 관련 작업을 할때, 헬스 check 등 GIL 에서 벗어나서 할 수 있을까 ?
 ProcessPoolExecutor 이걸 써야 할 거 같은데 이건 확인해봐야함
 안쓰는 것으로 보여짐 근데 그러면 과연 어떻게 처리 할것인가 ?
+
+왜 발전하지 않는가 ? 
+솔직히 더 이상 개발의 의미가 없음
+1. 내부 정책 등이 이미 다 만들어 놨고 
+2. 필요한 부분은 전부다 추가 개발 할 수 있도록 해놨음
+3. Python 이기에 성능 이슈가 반드시 있다고 보는데 이를 해결 하기 위해 별도의 프레임 워크를 
+쓸 수 있도록 전부다 구현 해놨음
+4. 따라서 Senlin을 메인 오케스트레이션으로 두고 별도 플러그인을 만드는 구조가 좋을 듯
+
+
+구조
+
+앞단에 api, wsgi(웹서버에서 python 호출 할 수 있도록 지원해주는 것)
+
+oslo_service 사용하여 실제 서비스 운영
+conductor : Lifecycle manager for a running service engine.
+engine : senlin engine
+health_manager : health_manager engine
+
+conductor 
+senlin-conductor는 senlin-api가 호출할 내부 RPC 인터페이스를 제공합니다.
+
+
+
+
