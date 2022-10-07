@@ -1,0 +1,131 @@
+코드 분석 10월 7일 
+
+
+
+실제 각 모듈은 object 파일을 통해 
+db에 필요한 작업인 생성, 삭제 등을 진행하고 
+로직 파일에서는 이를 import해서 사용
+
+
+
+
+
+1. 프로파일 (profiles 폴더)
+Senlin 서비스에서 관리 할 Node를 생성하는데 사용 되는 틀
+노드 생성에 필요한 정보를 인코딩
+
+
+
+
+
+
+Profile 객체 CRUD
+#base.py
+의문점 1. 왜 프로파일 객체에 compute
+A 노드 생성하는데 사용되는 툴이니까 실제로 해당 객체을 통해 Node 생성
+안에 glance, newwork, orchestration 등의 함수에서 client를 가져오는 것으로 봐서는 Profile 객체를 통해
+node 및 기타 작업을 생성하는 것으로 파악 
+근데 그것이 맞는 이유는 Node 생성에 사용 되는 틀이나까 각 버전? 등에 맞춘 
+client를 여기서 구성하는게 맞아 보임
+
+#os.nova.sever.py
+해당 파일에서 reboot, rebuild 등의 작업을 위한 기능 제공
+생성 및 삭제 보다는 노드에 대한 _validate_keypair, network port 생성 등 
+reboot, rebuild 등의 node에 대한 기능(?)을 제공
+
+#os.heat.stack.py
+실제 노드 생성에 삭제 등의 함수 가지고 있음
+do_create, do_delete
+
+#os.container.docker.py
+실제 노드 생성에 삭제 등의 함수 가지고 있음
+do_create, do_delete
+
+----------------------------------------
+
+2. 클러스터 
+클러스터 는 노드의 그룹. 클러스터에는 0개 이상의 노드가 포함될 수 있습니다.
+클러스터에는 구성원은 모두 같은 프로파일을 가지고 있다.
+
+#engine.cluster.py
+클러스터에 대한 생성 삭제, db load attach policy 등의 작업 진행 
+사실상 메인 파일
+
+#engine.cluster_policy.py
+policy에 대한 저장, 읽기 등 작업 제공
+
+
+3. 노드
+노드 는 Senlin 서비스에서 관리하는 논리적 개체 최대 하나의 클러스터 구성원이 될 수 있으며 
+노드는 클러스터에 속하지 않는 고아 노드일 수 있음.
+
+
+#engine.node.py
+노드 생성, 삭제 등을 담당함.
+위에서 언급되었듯이 노드의 생성 삭제에 
+   physical_id = pb.Profile.create_object(context, self)
+프로파일 객체가 사용 
+
+4. 정책
+정책 유형 은 특정 프로필 유형 의 노드를 포함하는 클러스터에서 작업 이 수행 될 때 확인 및/또는 시행되는 규칙
+
+#engine.cluster_policy.py
+클러스터 정책 저장 및 Load 
+
+#policies.base.py
+
+정책 관련한 저장 로드, 삭제 등등 담당
+근데 왜 
+
+    def nova(self, user, project):
+
+    nova, network가 있을까 ?
+    client을 리턴하도록 되어 있음
+
+    해당 함수는 여러 policy.py 파일 내에서 
+
+            nc = self.nova(context.user_id, context.project_id)
+            valid_azs = nc.validate_azs([az_name])
+    위에 처럼 정책 검증 관련한 것에서 불림
+    즉 해당 함수는 VM에 정보를 불러 오는 함수로 추정
+    
+# 다른 파일들 아래 함수 오버라이팅 함
+    def attach(self, cluster, enabled=True):
+        """Method to be invoked before policy is attached to a cluster."""
+    
+    def detach(self, cluster):
+        """Method to be invoked before policy is detached from a cluster."""
+
+    def pre_op(self, cluster_id, action):
+        """A method that will be invoked before an action execution."""
+
+    def post_op(self, cluster_id, action):
+        """A method that will be invoked after an action execution."""
+
+그외에 attach,
+
+
+5. 리시버
+Receiver 는 Senlin 엔진이 외부 경보 또는 이벤트에 반응하도록 준비 하여
+senlin 클러스터에서 특정 작업 이 자동으로 시작될 수 있도록 하는 데 사용
+훅 수신기를 생성할 때 --cluster대상 클러스터를 지정하는 옵션과 --action작업 이름
+
+
+#engine.receivers.base.py
+리시버 base 파일 
+두가지 타임 (webhook,message 지원)
+
+해당 함수에서 Action을 만들고 이를 수행
+    #engine.actions.base
+    action 정의 하는 부분 
+
+    #engine.actions.node_action.py
+
+
+기범 여담
+많은 사용자가 쓰기 어려운 이유 ?
+1.  senlin에서는 업무 수행시 thread를 만들고 이를 수행하는 구조
+근데 이러면 갑자기 엄청나게 많은 요청이 오는 경우 이를 동시 처리하는 것에 한계가 있진 않을까
+특히 cluster 관련 작업을 할때, 헬스 check 등 GIL 에서 벗어나서 할 수 있을까 ?
+ProcessPoolExecutor 이걸 써야 할 거 같은데 이건 확인해봐야함
+안쓰는 것으로 보여짐 근데 그러면 과연 어떻게 처리 할것인가 ?
