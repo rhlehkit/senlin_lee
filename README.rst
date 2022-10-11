@@ -9,7 +9,7 @@ senlin-api¶
 The senlin-api component provides an OpenStack-native REST API that processes API requests by sending them to the senlin-engine over RPC.
 
 
-
+oslo-service OpenStack 서비스를 실행하기 위한 라이브러리
 
 
 
